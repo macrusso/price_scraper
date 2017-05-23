@@ -12,6 +12,6 @@ From each part web page, the spider takes a list price, our price which is price
 
 ![2](https://cloud.githubusercontent.com/assets/20326862/26356928/9cfc292c-3fc5-11e7-95d1-627ba9269daa.JPG)
 
-###### An example view of Excel file with all fileds willed in.
+###### An example view of Excel file with all fileds filled in.
 
 
