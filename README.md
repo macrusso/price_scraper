@@ -1,17 +1,24 @@
-# Price scraper
+# Siemens Mall Price Scrapper
 
-Scrapy spider which gets prices form a web catalouge and saves them to an Excel file. 
+Small stand alone crawler script. Made to make my life easier, it goes through part numbers in a db and then goes to that parts pages and gets its prices.  
 
-Spider automatically logs in with provided credentials then iterates through the Excel file with parts numbers. It goes to the part’s web page by adding that part number at the end of basic web addres.
+### How to use
 
-![1](https://cloud.githubusercontent.com/assets/20326862/26356345/b3cf917c-3fc3-11e7-99b5-866e601ab791.JPG)
+Download both files. Start with *db_seed.py*, fill in part numbers you want to get prices for and then run the file. Then in *prices.py* insert your Siemens Mall credentials where `USER_LOGIN` and `USER_PASSWORD` are.
 
-###### An example view of a file with part numbers and columns to fill in. 
+Check locations of your Selenium Webdiver and SQLite files and change the code if needed.
 
-From each part web page, the spider takes a list price, our price which is price with discount and a part number. Everything goes into a spreadsheet, always to the same row as the part number. Additional part number is used only to check if the spider got into a proper page.  For every wrong part number, spiders returns an error message and passes empty cells. 
+Spider automatically logs in with provided credentials then iterates through the db. Two prices are taken, one is a list price for the item and second is a price with your company discount. If the webpage for the given part is non existent or there is no prices for some reason, script inserts error message to the table.
 
-![2](https://cloud.githubusercontent.com/assets/20326862/26356928/9cfc292c-3fc5-11e7-95d1-627ba9269daa.JPG)
+Below you can find example table with two prices scrapped and one wrong part number and error notification.
 
-###### An example view of Excel file with all fileds filled in.
+| Part number        | Discounted Price | List Price  |
+| ------------------ | :--------------: | :---------: |
+| 6ES7215-1HF40-0XB0 | 753.45           |  984.34     |
+| 6ES7414-3XM07-0AB1 | error            |  error      |
+| 6ES7221-1BF32-0XB0 | 72.94            |  96.90      |
 
-
+### Technologies used
+* Scrapy
+* Selenium
+* SQLite3

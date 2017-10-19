@@ -1,71 +1,74 @@
 from scrapy import Spider
 from scrapy.http import Request
+from scrapy.crawler import CrawlerProcess
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from time import sleep
 from urllib.parse import urljoin
-from openpyxl import load_workbook
-from openpyxl.utils import coordinate_from_string
+import sqlite3
 
 
 class PricesSpider(Spider):
     name = 'prices'
-    allowed_domains = ["web_to_scrape.com"]
+    allowed_domains = ["mall.industry.siemens.com"]
 
     def start_requests(self):
+        # 'login_url' is a page where spiders stars and logs in to get prices
+        # 'absolute_part_url' is a generic url to access particular part web page,
+        # a part number is added at the end of the url to do that
+        login_url = 'http://mall.industry.siemens.com/regpublic/Login.aspx?regionkey=GB&lang=en&app=MALL&ret=https' \
+                     '%3a%2f%2fmall.industry.siemens.com%2fgoos%2fWelcomePage.aspx%3fregionUrl%3d%252fuk&login=&pwd= '
+        absolute_part_url = 'https://mall.industry.siemens.com/mall/en/uk/Catalog/Product/'
 
-        # Opens Excel workbook then particular worksheet with parts numbers column
-        dest_filename = 'test.xlsx'
-        wb = load_workbook(dest_filename)
-        ws = wb['test']
-        cell_range = ws['A1':'A4']
-
-        # Loads Chrome driver with login page as first page and then logs in
-        scrapy_url = 'web_to_scrape.com/login'
+        # Chrome web driver opens login page(login_url), inserts a login and a password and then clicks the login button
         self.driver = webdriver.Chrome()
-        self.driver.get(scrapy_url)
-        sleep(2)
+        self.driver.get(login_url)
+        self.driver.find_element_by_id("ContentPlaceHolder1_TextSiemensLogin").send_keys('USER_LOGIN')
+        self.driver.find_element_by_id("ContentPlaceHolder1_TextPassword").send_keys('USER_PASSWORD')
+        self.driver.find_element_by_id("ContentPlaceHolder1_LoginUserNamePasswordButton").click()
+        # 'sleep' have to be there, Selenium works too slow and code executes faster than Selenium refreshes
+        # Seems like a typical problem as Selenium is not really crated for scrapping
+        sleep(3)
 
-        self.driver.find_element_by_id("login").send_keys('Foo')
-        self.driver.find_element_by_id("password").send_keys('Foo?')
-        self.driver.find_element_by_id("login_button").click()
-        sleep(5)
+        # SQLite connects to the DB
+        con = sqlite3.connect('test.db')
 
-        # Iterates through cells with parts
-        for part in cell_range:
+        with con:
+            cur = con.cursor()  # Setting up the cursor
+            cur.execute("SELECT Part_no FROM Parts")    # Getting parts number from the part table
+            parts = cur.fetchall()   # Creates list out of
 
-            # Gets row index form part's cell to put result in same row
-            a = (str(part[0])[-5:-1].replace(".", '').replace("'", ''))
-            row = (coordinate_from_string(str(a))[1])
+            # Iterating through the parts number in the table
+            for part in parts:
+                # Creating a part specific url by adding the a number and the end of the absolute url
+                # Variable 'part' is a tuple with a part number at [0] position
+                part_url = urljoin(absolute_part_url, part[0])
+                self.driver.get(part_url)
 
-            # Goes to part webpage
-            part_url = urljoin('http://web_to_scrape.com/', part[0].value)
-            self.driver.get(part_url)
-
-            # Checks if part's cell is empty or no, if empty goes to next one
-            if part[0].value is not None:
-
-                # Gets the part prices without currency code and part no to check if the same
                 try:
-                    price = self.driver.find_element_by_id("customer_price").text.replace('EUR', ' ').replace('.', '')
-                    list_price = self.driver.find_element_by_id("list_price").text.replace('EUR', ' ').replace('.', '')
-                    part_no = self.driver.find_element_by_class_name("product_id").text
+                    # Webdiver gets prices form a part web page
+                    # and then removes EUR symbols and thousands separators
+                    price = self.driver.find_element_by_id("CustomerPriceCell").text.replace('EUR', '').replace('.', '')
+                    list_price = self.driver.find_element_by_id("ListPriceCell").text.replace('EUR', '').replace('.', '')
 
-                    # Writes to the excel file
-                    ws.cell(row=row, column=3, value=price)
-                    ws.cell(row=row, column=4, value=list_price)
-                    ws.cell(row=row, column=5, value=part_no)
-                    wb.save(filename=dest_filename)
+                    # Updates the  table's row with new prices
+                    cur.execute("UPDATE Parts SET Our_price=?, List_price=? WHERE Part_no=?",
+                                (price, list_price, part[0]))
+                    con.commit()
 
-                # If part no is wrong, puts error massage
+                # When a part number is wrong or there is no such part, 'error' will be inserted to the table
                 except NoSuchElementException:
-                        ws.cell(row=row, column=3, value='Wrong part no')
-                        wb.save(filename=dest_filename)
+                    cur.execute("UPDATE Parts SET Our_price=?, List_price=? WHERE Part_no=?",
+                                ('error', 'error', part[0]))
+                    con.commit()
 
                 yield Request(part_url, callback=self.parse_price)
 
-            else:
-                pass
-
     def parse_price(self, response):
         pass
+
+# Pieces to use spider as a script
+if __name__ == "__main__":
+    process = CrawlerProcess()
+    process.crawl(PricesSpider)
+    process.start()     # The script will block here until the crawling is finished
