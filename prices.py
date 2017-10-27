@@ -46,7 +46,7 @@ class PricesSpider(Spider):
                 self.driver.get(part_url)
 
                 try:
-                    # Webdiver gets prices form a part web page
+                    # Webdiver gets prices form a part web pages
                     # and then removes EUR symbols and thousands separators
                     price = self.driver.find_element_by_id("CustomerPriceCell").text.replace('EUR', '').replace('.', '')
                     list_price = self.driver.find_element_by_id("ListPriceCell").text.replace('EUR', '').replace('.', '')
